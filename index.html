@@ -3,54 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>レトロ天気電光掲示板 - Mobile Ready</title>
+    <title>レトロ天気電光掲示板 - True Pixel Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
     <style>
         :root {
-            --stainless: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 45%, #e8e8e8 50%, #9e9e9e 55%, #eeeeee 100%);
+            /* 画像の質感を再現したヘアライン加工ステンレス */
+            --stainless: linear-gradient(145deg, #e6e6e6 0%, #c0c0c0 35%, #f0f0f0 50%, #a0a0a0 65%, #d9d9d9 100%);
         }
 
         body {
-            background-color: #1a1a1a;
+            background-color: #000;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             box-sizing: border-box;
             font-family: 'DotGothic16', sans-serif;
             overflow: hidden;
         }
 
-        /* 筐体：スマホでは画面幅に合わせて伸縮 */
+        /* 筐体：スマホでも正方形を維持 */
         .signage-frame {
             background: var(--stainless);
             width: 100%;
-            max-width: 450px;
-            aspect-ratio: 1 / 1; /* 正方形を維持 */
+            max-width: 480px;
+            aspect-ratio: 1 / 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 12%; /* 画面サイズに比例して丸める */
+            border-radius: 40px;
             box-shadow: 
-                0 15px 35px rgba(0,0,0,0.6),
-                inset -2px -2px 5px rgba(0,0,0,0.2),
-                inset 2px 2px 6px rgba(255,255,255,0.9);
-            border: 2px solid #999;
+                0 30px 60px rgba(0,0,0,0.9),
+                inset -3px -3px 8px rgba(0,0,0,0.4),
+                inset 3px 3px 10px rgba(255,255,255,1.0);
+            border: 1px solid #999;
             position: relative;
         }
 
-        /* LEDパネルの窓 */
+        /* LEDパネルを囲む黒いフレーム */
         .glass-cover {
-            background-color: #080808;
-            width: 85%;
-            height: 85%;
+            background-color: #050505;
+            width: 86%;
+            height: 86%;
             border-radius: 10px;
             box-shadow: 
-                inset 0 0 25px #000,
-                0 0 0 4px #444;
+                inset 0 0 40px #000,
+                0 0 0 5px #222;
             overflow: hidden;
             display: flex;
             align-items: center;
@@ -64,30 +65,28 @@
             image-rendering: pixelated;
         }
 
-        /* UIエリア：スマホでの入力しやすさを重視 */
+        /* UIエリア */
         .controls-container {
-            margin-top: 5vh;
+            margin-top: 30px;
             width: 100%;
             max-width: 400px;
             text-align: center;
             transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 10;
         }
 
         .controls-container.hidden {
             opacity: 0;
-            transform: translateY(30px) scale(0.9);
+            transform: translateY(30px);
             pointer-events: none;
         }
 
         .controls {
             display: flex;
             gap: 10px;
-            background: rgba(68, 68, 68, 0.8);
-            backdrop-filter: blur(5px);
+            background: rgba(45, 45, 45, 0.9);
             padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
             border: 1px solid #555;
         }
 
@@ -95,49 +94,34 @@
             flex: 1;
             padding: 12px;
             font-size: 18px;
-            background: #1a1a1a;
-            color: #fff;
+            background: #111;
+            color: #eee;
             border: 1px solid #666;
             text-align: center;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
+            border-radius: 6px;
+            font-family: monospace;
             outline: none;
-            /* iOSの自動ズーム防止 */
-            font-size: 16px; 
+            -webkit-appearance: none;
         }
 
-        /* プレースホルダーを薄く表示 */
-        input::placeholder {
-            color: #444;
-        }
-
-        input:focus { border-color: #ff8800; }
+        input::placeholder { color: #333; }
 
         button {
             padding: 0 20px;
             background: #555;
-            color: white;
+            color: #fff;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
             font-family: 'DotGothic16', sans-serif;
             transition: background 0.2s;
-            white-space: nowrap;
         }
-
-        button:active { background: #ff8800; }
 
         .status {
-            color: #888;
+            color: #666;
             font-size: 14px;
-            margin-bottom: 12px;
-            letter-spacing: 1px;
-        }
-
-        /* iOSでの入力欄の影を消去 */
-        input {
-            -webkit-appearance: none;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -145,26 +129,27 @@
 
     <div class="signage-frame">
         <div class="glass-cover">
-            <canvas id="led-display" width="400" height="400"></canvas>
+            <canvas id="led-display" width="480" height="480"></canvas>
         </div>
     </div>
 
     <div id="ui-wrapper" class="controls-container">
         <div class="status">郵便番号を入力してください</div>
         <div class="controls">
-            <input type="tel" id="zip-input" placeholder="0000000" maxlength="7" pattern="\d*">
+            <input type="tel" id="zip-input" placeholder="0000000" maxlength="7">
             <button onclick="getWeather()">設定</button>
         </div>
     </div>
 
     <script>
+        // --- 設定：画像と全く同じバランスに調整 ---
         const GRID_SIZE = 64; 
-        const DOT_SPACING = 6.2;
-        const DOT_SIZE = 2.0;
+        const DOT_SPACING = 7.5; // 画像の配置感に合わせた余白
+        const DOT_SIZE = 2.0;    // ★フォントが太くならないよう、ドット半径を小さく調整
         
-        const COLOR_OFF = "#121212";
-        const COLOR_ON = "#ff8800";
-        const GLOW_COLOR = "rgba(255, 120, 0, 0.35)";
+        const COLOR_OFF = "#0d0d0d";
+        const COLOR_ON = "#ff9900"; 
+        const GLOW_COLOR = "rgba(255, 130, 0, 0.35)";
 
         const canvas = document.getElementById('led-display');
         const ctx = canvas.getContext('2d');
@@ -187,12 +172,8 @@
         async function getWeather() {
             const zipInput = document.getElementById('zip-input');
             const zip = zipInput.value;
-            if (!zip.match(/^\d{7}$/)) {
-                alert("7桁の数字を入力してください。");
-                return;
-            }
+            if (!zip.match(/^\d{7}$/)) return;
 
-            // キーボードを閉じる（スマホ対策）
             zipInput.blur();
             uiWrapper.classList.add('hidden');
             stopLoop();
@@ -200,10 +181,6 @@
             try {
                 const geoRes = await fetch(`https://geoapi.heartrails.com/api/json?method=searchByPostal&postal=${zip}`);
                 const geoData = await geoRes.json();
-                
-                if (!geoData.response || !geoData.response.location) {
-                    throw new Error("正しい郵便番号を入力してください。");
-                }
                 const loc = geoData.response.location[0];
 
                 const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.y}&longitude=${loc.x}&daily=weather_code&timezone=Asia%2FTokyo`);
@@ -213,38 +190,27 @@
                 generateSequence(code);
                 runLoop();
             } catch (err) {
-                alert(err.message);
                 uiWrapper.classList.remove('hidden');
             }
         }
 
         function generateSequence(code) {
-            displaySequence = [{ type: 'text', content: "明日の天気", duration: 2500 }];
+            displaySequence = [{ type: 'text', content: "明日の天気", duration: 3000 }];
 
             if (code === 0) {
                 displaySequence.push({ type: 'icon', content: "☀", duration: 4000 });
-            } else if (code >= 1 && code <= 3) {
+            } else if (code <= 3) {
                 displaySequence.push(
-                    { type: 'icon', content: "☀", duration: 2200 },
-                    { type: 'text', content: "ときどき", duration: 1500 },
-                    { type: 'icon', content: "☁", duration: 2200 }
+                    { type: 'icon', content: "☀", duration: 2500 },
+                    { type: 'text', content: "ときどき", duration: 1800 },
+                    { type: 'icon', content: "☁", duration: 2500 }
                 );
-            } else if (code >= 45 && code <= 48) {
-                displaySequence.push({ type: 'icon', content: "🌫", duration: 4000 });
-            } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+            } else if (code >= 51) {
                 displaySequence.push(
-                    { type: 'icon', content: "☁", duration: 2200 },
-                    { type: 'text', content: "のち", duration: 1500 },
-                    { type: 'icon', content: "☂", duration: 2200 }
+                    { type: 'icon', content: "☁", duration: 2500 },
+                    { type: 'text', content: "のち", duration: 1800 },
+                    { type: 'icon', content: "☂", duration: 2500 }
                 );
-            } else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
-                displaySequence.push(
-                    { type: 'icon', content: "☁", duration: 2200 },
-                    { type: 'text', content: "のち", duration: 1500 },
-                    { type: 'icon', content: "☃", duration: 2200 }
-                );
-            } else if (code >= 95) {
-                displaySequence.push({ type: 'icon', content: "⚡", duration: 4000 });
             } else {
                 displaySequence.push({ type: 'icon', content: "☁", duration: 4000 });
             }
@@ -258,8 +224,9 @@
             bufferCtx.textBaseline = "middle";
 
             if (type === 'text') {
+                // ★Boldを解除し、アンチエイリアスが最小限になるようフォントサイズを微調整
                 bufferCtx.font = "14px 'DotGothic16'";
-                const maxWidth = GRID_SIZE - 4;
+                const maxWidth = GRID_SIZE - 6;
                 bufferCtx.fillText(content, GRID_SIZE/2, GRID_SIZE/2, maxWidth);
             } else {
                 bufferCtx.font = "34px sans-serif";
@@ -277,7 +244,8 @@
             for (let y = 0; y < GRID_SIZE; y++) {
                 for (let x = 0; x < GRID_SIZE; x++) {
                     const index = (y * GRID_SIZE + x) * 4;
-                    const isOn = pixelData.data[index + 3] > 120;
+                    // 透明度判定を厳格にして、隣のドットとの繋がりを抑える
+                    const isOn = pixelData.data[index + 3] > 180;
 
                     const drawX = offset + x * DOT_SPACING + (DOT_SPACING / 2);
                     const drawY = offset + y * DOT_SPACING + (DOT_SPACING / 2);
@@ -287,7 +255,7 @@
                     
                     if (isOn) {
                         ctx.fillStyle = COLOR_ON;
-                        ctx.shadowBlur = 6;
+                        ctx.shadowBlur = 4; // 光のにじみを抑えてシャープに
                         ctx.shadowColor = GLOW_COLOR;
                     } else {
                         ctx.fillStyle = COLOR_OFF;

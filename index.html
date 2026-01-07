@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>レトロ天気電光掲示板 - Mobile Ready</title>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --stainless: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 45%, #e8e8e8 50%, #9e9e9e 55%, #eeeeee 100%);
+        }
+
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            font-family: 'DotGothic16', sans-serif;
+            overflow: hidden;
+        }
+
+        /* 筐体：スマホでは画面幅に合わせて伸縮 */
+        .signage-frame {
+            background: var(--stainless);
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1 / 1; /* 正方形を維持 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12%; /* 画面サイズに比例して丸める */
+            box-shadow: 
+                0 15px 35px rgba(0,0,0,0.6),
+                inset -2px -2px 5px rgba(0,0,0,0.2),
+                inset 2px 2px 6px rgba(255,255,255,0.9);
+            border: 2px solid #999;
+            position: relative;
+        }
+
+        /* LEDパネルの窓 */
+        .glass-cover {
+            background-color: #080808;
+            width: 85%;
+            height: 85%;
+            border-radius: 10px;
+            box-shadow: 
+                inset 0 0 25px #000,
+                0 0 0 4px #444;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas#led-display {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        /* UIエリア：スマホでの入力しやすさを重視 */
+        .controls-container {
+            margin-top: 5vh;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+        }
+
+        .controls-container.hidden {
+            opacity: 0;
+            transform: translateY(30px) scale(0.9);
+            pointer-events: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            background: rgba(68, 68, 68, 0.8);
+            backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            border: 1px solid #555;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            font-size: 18px;
+            background: #1a1a1a;
+            color: #fff;
+            border: 1px solid #666;
+            text-align: center;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            outline: none;
+            /* iOSの自動ズーム防止 */
+            font-size: 16px; 
+        }
+
+        /* プレースホルダーを薄く表示 */
+        input::placeholder {
+            color: #444;
+        }
+
+        input:focus { border-color: #ff8800; }
+
+        button {
+            padding: 0 20px;
+            background: #555;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'DotGothic16', sans-serif;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        button:active { background: #ff8800; }
+
+        .status {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        /* iOSでの入力欄の影を消去 */
+        input {
+            -webkit-appearance: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="signage-frame">
+        <div class="glass-cover">
+            <canvas id="led-display" width="400" height="400"></canvas>
+        </div>
+    </div>
+
+    <div id="ui-wrapper" class="controls-container">
+        <div class="status">郵便番号を入力してください</div>
+        <div class="controls">
+            <input type="tel" id="zip-input" placeholder="0000000" maxlength="7" pattern="\d*">
+            <button onclick="getWeather()">設定</button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 64; 
+        const DOT_SPACING = 6.2;
+        const DOT_SIZE = 2.0;
+        
+        const COLOR_OFF = "#121212";
+        const COLOR_ON = "#ff8800";
+        const GLOW_COLOR = "rgba(255, 120, 0, 0.35)";
+
+        const canvas = document.getElementById('led-display');
+        const ctx = canvas.getContext('2d');
+        const uiWrapper = document.getElementById('ui-wrapper');
+
+        const bufferCanvas = document.createElement('canvas');
+        const bufferCtx = bufferCanvas.getContext('2d');
+        bufferCanvas.width = GRID_SIZE;
+        bufferCanvas.height = GRID_SIZE;
+
+        let displaySequence = [];
+        let currentIndex = 0;
+        let animationFrameId;
+
+        window.onload = () => {
+            renderToBuffer("明日の天気", 'text');
+            drawGrid(bufferCtx.getImageData(0, 0, GRID_SIZE, GRID_SIZE));
+        };
+
+        async function getWeather() {
+            const zipInput = document.getElementById('zip-input');
+            const zip = zipInput.value;
+            if (!zip.match(/^\d{7}$/)) {
+                alert("7桁の数字を入力してください。");
+                return;
+            }
+
+            // キーボードを閉じる（スマホ対策）
+            zipInput.blur();
+            uiWrapper.classList.add('hidden');
+            stopLoop();
+
+            try {
+                const geoRes = await fetch(`https://geoapi.heartrails.com/api/json?method=searchByPostal&postal=${zip}`);
+                const geoData = await geoRes.json();
+                
+                if (!geoData.response || !geoData.response.location) {
+                    throw new Error("正しい郵便番号を入力してください。");
+                }
+                const loc = geoData.response.location[0];
+
+                const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.y}&longitude=${loc.x}&daily=weather_code&timezone=Asia%2FTokyo`);
+                const weatherData = await weatherRes.json();
+                const code = weatherData.daily.weather_code[1]; 
+
+                generateSequence(code);
+                runLoop();
+            } catch (err) {
+                alert(err.message);
+                uiWrapper.classList.remove('hidden');
+            }
+        }
+
+        function generateSequence(code) {
+            displaySequence = [{ type: 'text', content: "明日の天気", duration: 2500 }];
+
+            if (code === 0) {
+                displaySequence.push({ type: 'icon', content: "☀", duration: 4000 });
+            } else if (code >= 1 && code <= 3) {
+                displaySequence.push(
+                    { type: 'icon', content: "☀", duration: 2200 },
+                    { type: 'text', content: "ときどき", duration: 1500 },
+                    { type: 'icon', content: "☁", duration: 2200 }
+                );
+            } else if (code >= 45 && code <= 48) {
+                displaySequence.push({ type: 'icon', content: "🌫", duration: 4000 });
+            } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+                displaySequence.push(
+                    { type: 'icon', content: "☁", duration: 2200 },
+                    { type: 'text', content: "のち", duration: 1500 },
+                    { type: 'icon', content: "☂", duration: 2200 }
+                );
+            } else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
+                displaySequence.push(
+                    { type: 'icon', content: "☁", duration: 2200 },
+                    { type: 'text', content: "のち", duration: 1500 },
+                    { type: 'icon', content: "☃", duration: 2200 }
+                );
+            } else if (code >= 95) {
+                displaySequence.push({ type: 'icon', content: "⚡", duration: 4000 });
+            } else {
+                displaySequence.push({ type: 'icon', content: "☁", duration: 4000 });
+            }
+            currentIndex = 0;
+        }
+
+        function renderToBuffer(content, type) {
+            bufferCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+            bufferCtx.fillStyle = "#fff";
+            bufferCtx.textAlign = "center";
+            bufferCtx.textBaseline = "middle";
+
+            if (type === 'text') {
+                bufferCtx.font = "14px 'DotGothic16'";
+                const maxWidth = GRID_SIZE - 4;
+                bufferCtx.fillText(content, GRID_SIZE/2, GRID_SIZE/2, maxWidth);
+            } else {
+                bufferCtx.font = "34px sans-serif";
+                bufferCtx.fillText(content, GRID_SIZE/2, GRID_SIZE/2 + 4);
+            }
+            return bufferCtx.getImageData(0, 0, GRID_SIZE, GRID_SIZE);
+        }
+
+        function drawGrid(pixelData) {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const offset = (canvas.width - (GRID_SIZE * DOT_SPACING)) / 2;
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const index = (y * GRID_SIZE + x) * 4;
+                    const isOn = pixelData.data[index + 3] > 120;
+
+                    const drawX = offset + x * DOT_SPACING + (DOT_SPACING / 2);
+                    const drawY = offset + y * DOT_SPACING + (DOT_SPACING / 2);
+
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, DOT_SIZE, 0, Math.PI * 2);
+                    
+                    if (isOn) {
+                        ctx.fillStyle = COLOR_ON;
+                        ctx.shadowBlur = 6;
+                        ctx.shadowColor = GLOW_COLOR;
+                    } else {
+                        ctx.fillStyle = COLOR_OFF;
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.fill();
+                }
+            }
+        }
+
+        function stopLoop() { if (animationFrameId) clearTimeout(animationFrameId); }
+
+        function runLoop() {
+            const currentItem = displaySequence[currentIndex];
+            const pixelData = renderToBuffer(currentItem.content, currentItem.type);
+            drawGrid(pixelData);
+            currentIndex = (currentIndex + 1) % displaySequence.length;
+            animationFrameId = setTimeout(runLoop, currentItem.duration);
+        }
+    </script>
+</body>
+</html>
